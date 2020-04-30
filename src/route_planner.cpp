@@ -12,13 +12,12 @@ RoutePlanner::RoutePlanner(RouteModel &model, float start_x, float start_y, floa
     end_y *= 0.01;
 
     // save the closest nodes to the start and end
-    *start_node = m_Model.FindClosestNode(start_x, start_y);
-    *end_node = m_Model.FindClosestNode(end_x, end_y);
+    start_node = &m_Model.FindClosestNode(start_x, start_y);
+    end_node = &m_Model.FindClosestNode(end_x, end_y);
 }
 
 float RoutePlanner::CalculateHValue(RouteModel::Node const *node) {
-  RouteModel::Node myNode = *node;
-  return node->distance(myNode);
+  return node->distance(*end_node);
 }
 
 // TODO 4: Complete the AddNeighbors method to expand the current node by adding all unvisited neighbors to the open list.
@@ -75,17 +74,20 @@ std::vector<RouteModel::Node> RoutePlanner::ConstructFinalPath(RouteModel::Node 
     // Create path_found vector
     distance = 0.0f;
     std::vector<RouteModel::Node> path_found;
-    RouteModel::Node *position = current_node;
-  
-    while (position != start_node){
-      RouteModel::Node parent = *(*position).parent;
+   
+    while (current_node != start_node){
+      // get the current node's parent
+      RouteModel::Node * parent = current_node->parent;
       // add the distance from the node to its parent to the distance variable.
-      distance += position->distance(*(position->parent));
+      distance += current_node->distance(*parent);
       // add the position to the path
-      path_found.insert(path_found.begin(), *position);
+      path_found.insert(path_found.begin(), *current_node);
       // move to the next element
-      position = position->parent;
+      current_node = parent;
     }
+  
+    // add the start node to the vector
+    path_found.insert(path_found.begin(), *start_node);
 
     distance *= m_Model.MetricScale(); // Multiply the distance by the scale of the map to get meters.
     return path_found;
@@ -100,12 +102,15 @@ std::vector<RouteModel::Node> RoutePlanner::ConstructFinalPath(RouteModel::Node 
 // - Store the final path in the m_Model.path attribute before the method exits. This path will then be displayed on the map tile.
 
 void RoutePlanner::AStarSearch() {
+  // start at the first node
   RouteModel::Node *current_node = start_node;
+  start_node->visited = true;
+  open_list.push_back(start_node);
   
-  while (current_node->distance(*end_node) > 0){
-    this->AddNeighbors(current_node);
-    current_node = this->NextNode();
+  while (current_node != end_node){
+    AddNeighbors(current_node);
+    current_node = NextNode();
   }
   
-  this->m_Model.path = this->ConstructFinalPath(current_node);
+  m_Model.path = ConstructFinalPath(end_node);
 }
